@@ -1,34 +1,100 @@
 # Comm-Log Send Reconciliation
 
-Take-home: reconcile the `target_base` metric for merchant 501's Diwali
-campaigns in October 2026, and get from a naive row count to Finance's
-number (22) with every step justified by the data.
+Take-home assignment to reconcile the `target_base` metric for **merchant 501's Diwali campaigns during October 2026**.
 
-## Structure
+**Finance target_base: 22**
 
+## Objective
+
+The goal is to start with a simple row count, investigate why it differs from Finance's number, and apply the business rules from the provided data dictionary to arrive at the correct `target_base`.
+
+The reconciliation is:
+
+```text
+30  →  26  →  23  →  22
 ```
-data/                    raw data as given (SQLite db + CSVs)
-sql/00_naive_baseline.sql       the first, obvious query -> 30
-sql/01_investigation.sql        queries used to find each discrepancy
-sql/02_final_target_base.sql    final query -> 22, nothing hardcoded
-sql/03_validation.sql           two independent checks on the result
-RECONCILIATION.md               write-up: bridge, findings, summary
+
+* **30** — initial scoped communication-log rows
+* **26** — exclude sends from the campaign that was still awaiting approval
+* **23** — collapse duplicate customers within the first retry chain
+* **22** — collapse the duplicate customer within the second retry chain
+
+The detailed investigation and reasoning are documented in `RECONCILIATION.md`.
+
+## Repository Structure
+
+```text
+.
+├── README.md
+├── RECONCILIATION.md
+│
+├── data/
+│   ├── campaign.csv
+│   ├── communication_log.csv
+│   └── comm_log.db
+│
+└── sql/
+    ├── 00_naive_baseline.sql
+    ├── 01_investigation.sql
+    ├── 02_final_target_base.sql
+    └── 03_validation.sql
 ```
 
-## Running it
+## SQL Files
 
-```
+| File                       | Purpose                                     |
+| -------------------------- | ------------------------------------------- |
+| `00_naive_baseline.sql`    | Initial straightforward query → 30          |
+| `01_investigation.sql`     | Queries used to investigate the differences |
+| `02_final_target_base.sql` | Final calculation → 22                      |
+| `03_validation.sql`        | Additional checks to validate the result    |
+
+## Running the Queries
+
+The queries can be run using SQLite:
+
+```bash
 sqlite3 data/comm_log.db < sql/00_naive_baseline.sql
+```
+
+Run the investigation queries:
+
+```bash
+sqlite3 data/comm_log.db < sql/01_investigation.sql
+```
+
+Run the final calculation:
+
+```bash
 sqlite3 data/comm_log.db < sql/02_final_target_base.sql
+```
+
+Run the validation checks:
+
+```bash
 sqlite3 data/comm_log.db < sql/03_validation.sql
 ```
 
-## TL;DR
+## Result
 
-A plain `COUNT(*)` over the scoped data gives 30. That number is wrong for
-two reasons: one campaign in the mix was never approved (its sends still
-happened, but they don't count for reporting), and two of the campaign
-groups are retry chains where the same customer was messaged more than
-once for the same underlying communication. Once unapproved sends are
-dropped and retry chains are collapsed to distinct customers, the result
-is 22 -- matching Finance. Full reasoning is in `RECONCILIATION.md`.
+The final query produces:
+
+```text
+target_base
+-----------
+22
+```
+
+The final SQL does not hardcode `22`; the result comes from applying the campaign eligibility and retry-chain rules to the underlying data.
+
+## Documentation
+
+See [`RECONCILIATION.md`](RECONCILIATION.md) for:
+
+* the reconciliation bridge
+* investigation steps
+* reasons for each adjustment
+* final SQL explanation
+* validation results
+* observations from the data
+
