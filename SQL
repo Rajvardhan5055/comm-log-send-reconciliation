@@ -9,3 +9,36 @@ WHERE c.merchant_id = 501
   AND cl.sent_time <  '2026-11-01';
 
 
+-- Check campaign approval and processing status.
+SELECT creation_status, processing_status, COUNT(*) AS campaigns
+FROM campaign
+WHERE merchant_id = 501
+GROUP BY creation_status, processing_status;
+
+-- Find unapproved campaigns and their send records.
+SELECT c.id, c.name, c.creation_status, COUNT(*) AS rows_in_comm_log
+FROM communication_log cl
+JOIN campaign c ON c.id = cl.communication_id
+WHERE c.creation_status = 'approval_awaiting'
+GROUP BY c.id;
+
+-- Check customers across the first retry chain.
+SELECT customer_id, communication_id, delivery_status, sent_time
+FROM communication_log
+WHERE communication_id IN (9001, 9002, 9003)
+ORDER BY customer_id, sent_time;
+
+-- Check customers across the second retry chain.
+SELECT customer_id, communication_id, delivery_status, sent_time
+FROM communication_log
+WHERE communication_id IN (9201, 9202)
+ORDER BY customer_id, sent_time;
+
+-- Check that campaign 9101 is standalone.
+SELECT id, parent_id FROM campaign WHERE id = 9101;
+
+SELECT customer_id, COUNT(*) AS sends
+FROM communication_log
+WHERE communication_id = 9101
+GROUP BY customer_id
+HAVING COUNT(*) > 1;
